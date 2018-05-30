@@ -62,7 +62,11 @@ func returnHttpClient(client *http.Client, req *http.Request, resp *http.Respons
 	lastTime := globalAllClientCache[client]
 	duration := time.Now().Sub(lastTime)
 	if duration > time.Millisecond*500 {
-		glog.Warning("|||request too slow|||", duration.Seconds(), "|||", req.Host, "|||", req.URL.String(), "|||", req.Method, "|||", resp.Header)
+		if resp != nil {
+			glog.Warning("|||request too slow|||", duration.Seconds(), "|||", req.Host, "|||", req.URL.String(), "|||", req.Method, "|||", resp.Header)
+		} else {
+			glog.Warning("|||request too slow|||", duration.Seconds(), "|||", req.Host, "|||", req.URL.String(), "|||", req.Method, "|||", "empty")
+		}
 		glog.Flush()
 	}
 	globalAllClientCache[client] = time.Time{}
