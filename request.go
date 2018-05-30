@@ -4,14 +4,69 @@ import (
 	"bytes"
 	"crypto/md5"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httputil"
+	"sync"
+	"time"
 
 	"encoding/json"
 	"io/ioutil"
 
 	"github.com/golang/glog"
 )
+
+func PrintLocalDial(network, addr string) (net.Conn, error) {
+	dial := net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
+	conn, err := dial.Dial(network, addr)
+	if err != nil {
+		return conn, err
+	}
+
+	glog.Info("connect done, use ", conn.LocalAddr().String())
+	glog.Flush()
+
+	return conn, err
+}
+
+var globalAllClientCache = make(map[*http.Client]time.Time)
+var globallClientCacheLock = sync.Mutex{}
+
+func getHttpClient() *http.Client {
+	globallClientCacheLock.Lock()
+	defer globallClientCacheLock.Unlock()
+	for client, lastTime := range globalAllClientCache {
+		if lastTime.IsZero() {
+			globalAllClientCache[client] = time.Now()
+			return client
+		}
+	}
+	glog.Info("create http client")
+	client := &http.Client{
+		Transport: &http.Transport{
+			Dial:                PrintLocalDial,
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+		},
+	}
+	globalAllClientCache[client] = time.Now()
+	return client
+}
+func returnHttpClient(client *http.Client, req *http.Request, resp *http.Response) {
+	globallClientCacheLock.Lock()
+	defer globallClientCacheLock.Unlock()
+	lastTime := globalAllClientCache[client]
+	duration := time.Now().Sub(lastTime)
+	if duration > time.Millisecond*500 {
+		glog.Warning("|||request too slow|||", duration.Seconds(), "|||", req.Host, "|||", req.URL.String(), "|||", req.Method, "|||", resp.Header)
+		glog.Flush()
+	}
+	globalAllClientCache[client] = time.Time{}
+}
 
 // request sends a request to alibaba cloud Log Service.
 // @note if error is nil, you must call http.Response.Body.Close() to finalize reader
@@ -74,6 +129,10 @@ func request(project *LogProject, method, uri string, headers map[string]string,
 		req.Header.Add(k, v)
 	}
 
+	// Get ready to do request
+	httpClient := getHttpClient()
+	req.Header["Connection"] = []string{"Keep-Alive"}
+
 	if glog.V(5) {
 		dump, e := httputil.DumpRequest(req, true)
 		if e != nil {
@@ -82,8 +141,8 @@ func request(project *LogProject, method, uri string, headers map[string]string,
 		glog.Infof("HTTP Request:\n%v", string(dump))
 	}
 
-	// Get ready to do request
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
+	defer returnHttpClient(httpClient, req, resp)
 	if err != nil {
 		return nil, err
 	}
@@ -99,12 +158,15 @@ func request(project *LogProject, method, uri string, headers map[string]string,
 		return nil, err
 	}
 
-	if glog.V(5) {
+	if glog.V(6) {
 		dump, e := httputil.DumpResponse(resp, true)
 		if e != nil {
 			glog.Info(e)
 		}
 		glog.Infof("HTTP Response:\n%v", string(dump))
+	} else if glog.V(5) {
+		glog.Infof("HTTP Response Header:\n%v", resp.Header)
 	}
+
 	return resp, nil
 }
