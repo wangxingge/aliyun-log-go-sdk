@@ -151,16 +151,16 @@ func (p *LogProject) CreateLogStore(name string, ttl, shardCnt int, autoSplit bo
 		Name          string `json:"logstoreName"`
 		TTL           int    `json:"ttl"`
 		ShardCount    int    `json:"shardCount"`
-		AutoSplit     bool   `json:"autoSplit"`
-		MaxSplitShard int    `json:"maxSplitShard"`
+		//AutoSplit     bool   `json:"autoSplit"`
+		//MaxSplitShard int    `json:"maxSplitShard"`
 		WebTracking   bool   `json:"enable_tracking"`
 	}
 	store := &Body{
 		Name:          name,
 		TTL:           ttl,
 		ShardCount:    shardCnt,
-		AutoSplit:     autoSplit,
-		MaxSplitShard: maxSplitShard,
+		//AutoSplit:     autoSplit,
+		//MaxSplitShard: maxSplitShard,
 	}
 	body, err := json.Marshal(store)
 	if err != nil {
