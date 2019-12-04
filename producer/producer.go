@@ -38,6 +38,11 @@ func InitProducer(producerConfig *ProducerConfig) *Producer {
 		AccessKeyID:     producerConfig.AccessKeyID,
 		AccessKeySecret: producerConfig.AccessKeySecret,
 	}
+
+	if len(producerConfig.SecurityToken) > 0 {
+		client.SecurityToken = producerConfig.SecurityToken
+	}
+
 	finalProducerConfig := validateProducerConfig(producerConfig)
 	retryQueue := initRetryQueue()
 	errorStatusMap := func() map[int]*string {

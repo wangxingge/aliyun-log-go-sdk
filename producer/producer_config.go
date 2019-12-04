@@ -24,6 +24,7 @@ type ProducerConfig struct {
 	Endpoint              string
 	AccessKeyID           string
 	AccessKeySecret       string
+	SecurityToken         string
 	NoRetryStatusCodeList []int
 }
 
